@@ -86,4 +86,39 @@ export const api = {
       method: "POST",
     }),
   exportUrl: (vacancyId: string) => `/api/vacancies/${vacancyId}/export`,
+
+  // organizations / billing / members
+  getOrg: () => request<import("./types").OrgInfo>("/api/org"),
+  listOrgs: () => request<import("./types").OrgSummary[]>("/api/orgs"),
+  switchOrg: (orgId: string) =>
+    request<import("./types").OrgInfo>("/api/org/switch", {
+      method: "POST",
+      body: JSON.stringify({ org_id: orgId }),
+    }),
+  listPlans: () => request<import("./types").PlanInfo[]>("/api/org/plans"),
+  changePlan: (plan: string) =>
+    request<import("./types").OrgInfo>("/api/org/plan", {
+      method: "POST",
+      body: JSON.stringify({ plan }),
+    }),
+  listMembers: () => request<import("./types").Member[]>("/api/org/members"),
+  changeMemberRole: (membershipId: string, role: string) =>
+    request<import("./types").Member>(`/api/org/members/${membershipId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (membershipId: string) =>
+    request<void>(`/api/org/members/${membershipId}`, { method: "DELETE" }),
+  listInvitations: () =>
+    request<import("./types").Invitation[]>("/api/org/invitations"),
+  createInvitation: (email: string, role: string) =>
+    request<import("./types").Invitation>("/api/org/invitations", {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  acceptInvitation: (token: string) =>
+    request<import("./types").OrgInfo>("/api/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
 };

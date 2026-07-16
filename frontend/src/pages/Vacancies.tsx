@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError, setToken } from "../api";
-import { Vacancy } from "../types";
+import { OrgInfo, Vacancy } from "../types";
 
 export function VacanciesPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [org, setOrg] = useState<OrgInfo | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -15,6 +16,7 @@ export function VacanciesPage() {
 
   useEffect(() => {
     api.listVacancies().then(setVacancies).catch(() => {});
+    api.getOrg().then(setOrg).catch(() => {});
   }, []);
 
   async function createVacancy(e: FormEvent) {
@@ -34,15 +36,22 @@ export function VacanciesPage() {
     <div className="page">
       <header className="topbar">
         <h1>AI Screening</h1>
-        <button
-          className="link"
-          onClick={() => {
-            setToken(null);
-            navigate("/login");
-          }}
-        >
-          Выйти
-        </button>
+        <div className="actions">
+          {org && (
+            <Link to="/settings" className="badge">
+              {org.name} · {org.limits.label}
+            </Link>
+          )}
+          <button
+            className="link"
+            onClick={() => {
+              setToken(null);
+              navigate("/login");
+            }}
+          >
+            Выйти
+          </button>
+        </div>
       </header>
 
       <div className="page-head">

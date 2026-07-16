@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from .models import AnalysisStatus, CandidateStatus, VacancyStatus
+from .models import AnalysisStatus, CandidateStatus, PlanTier, Role, VacancyStatus
 
 
 # --- auth ---
@@ -85,3 +85,70 @@ class CandidateOut(BaseModel):
 
 class CandidateStatusUpdate(BaseModel):
     status: CandidateStatus
+
+
+# --- organizations / billing / members ---
+
+class OrgOut(BaseModel):
+    id: str
+    name: str
+    plan: PlanTier
+    role: Role  # роль текущего пользователя в этом пространстве
+    limits: dict
+    usage: dict  # {analyses_used, vacancies, members}
+
+
+class OrgSummary(BaseModel):
+    id: str
+    name: str
+    role: Role
+
+
+class PlanInfo(BaseModel):
+    plan: PlanTier
+    label: str
+    price: int | None
+    max_vacancies: int | None
+    monthly_analyses: int | None
+    max_members: int | None
+    current: bool
+
+
+class PlanChange(BaseModel):
+    plan: PlanTier
+
+
+class MemberOut(BaseModel):
+    id: str  # membership id
+    user_id: str
+    email: str
+    name: str
+    role: Role
+
+
+class RoleChange(BaseModel):
+    role: Role
+
+
+class InviteCreate(BaseModel):
+    email: EmailStr
+    role: Role = Role.recruiter
+
+
+class InvitationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    email: str
+    role: Role
+    token: str
+    accepted: bool
+    created_at: datetime
+
+
+class AcceptInvite(BaseModel):
+    token: str
+
+
+class SwitchOrg(BaseModel):
+    org_id: str

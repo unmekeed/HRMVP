@@ -15,11 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..database import get_db
-from ..deps import get_current_user
-from ..models import AnalysisStatus, Candidate, User, Vacancy
+from ..deps import get_current_org, get_current_user
+from ..models import AnalysisStatus, Candidate, Organization, User, Vacancy
 from ..schemas import CandidateOut, CandidateStatusUpdate
 from ..services.batch import should_use_batch
 from ..services.extraction import ExtractionError, extract_text
+from ..services.limits import consume_analyses
 from ..services.tasks import enqueue_analysis, enqueue_batch
 from .vacancies import get_own_vacancy
 
@@ -35,6 +36,7 @@ async def upload_resumes(
     background: BackgroundTasks,
     files: list[UploadFile],
     vacancy: Vacancy = Depends(get_own_vacancy),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
     if not files:
@@ -65,6 +67,9 @@ async def upload_resumes(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "; ".join(errors) or "Не удалось обработать файлы",
         )
+
+    # Списываем квоту анализов тарифа по числу принятых резюме
+    await consume_analyses(org, len(created), db)
     await db.commit()
 
     ids = [c.id for c in created]
@@ -95,13 +100,13 @@ async def list_candidates(
 
 
 async def _get_own_candidate(
-    candidate_id: str, user: User, db: AsyncSession
+    candidate_id: str, org: Organization, db: AsyncSession
 ) -> Candidate:
     candidate = await db.get(Candidate, candidate_id)
     if candidate is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Кандидат не найден")
     vacancy = await db.get(Vacancy, candidate.vacancy_id)
-    if vacancy is None or vacancy.owner_id != user.id:
+    if vacancy is None or vacancy.org_id != org.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Кандидат не найден")
     return candidate
 
@@ -109,20 +114,20 @@ async def _get_own_candidate(
 @router.get("/candidates/{candidate_id}", response_model=CandidateOut)
 async def get_candidate(
     candidate_id: str,
-    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
-    return CandidateOut.model_validate(await _get_own_candidate(candidate_id, user, db))
+    return CandidateOut.model_validate(await _get_own_candidate(candidate_id, org, db))
 
 
 @router.patch("/candidates/{candidate_id}/status", response_model=CandidateOut)
 async def update_candidate_status(
     candidate_id: str,
     payload: CandidateStatusUpdate,
-    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
-    candidate = await _get_own_candidate(candidate_id, user, db)
+    candidate = await _get_own_candidate(candidate_id, org, db)
     candidate.status = payload.status
     await db.commit()
     return CandidateOut.model_validate(candidate)
@@ -132,10 +137,11 @@ async def update_candidate_status(
 async def reanalyze_candidate(
     candidate_id: str,
     background: BackgroundTasks,
-    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
-    candidate = await _get_own_candidate(candidate_id, user, db)
+    candidate = await _get_own_candidate(candidate_id, org, db)
+    await consume_analyses(org, 1, db)
     candidate.analysis_status = AnalysisStatus.pending
     candidate.analysis_error = ""
     await db.commit()

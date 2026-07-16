@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import init_db
-from .routers import auth, candidates, vacancies
+from .routers import auth, candidates, org, vacancies
 
 
 @asynccontextmanager
@@ -25,6 +25,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(org.router)
+app.include_router(org.invite_router)
 app.include_router(vacancies.router)
 app.include_router(candidates.router)
 

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import User
+from ..models import Membership, Organization, Role, User
 from ..schemas import TokenOut, UserLogin, UserOut, UserRegister
 from ..security import create_access_token, hash_password, verify_password
 
@@ -22,6 +22,16 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
         password_hash=hash_password(payload.password),
     )
     db.add(user)
+    await db.flush()
+
+    # Персональное рабочее пространство, пользователь — владелец
+    workspace_name = (payload.name or payload.email.split("@")[0]) + " — рабочее пространство"
+    org = Organization(name=workspace_name)
+    db.add(org)
+    await db.flush()
+    db.add(Membership(org_id=org.id, user_id=user.id, role=Role.owner))
+    user.active_org_id = org.id
+
     await db.commit()
     return TokenOut(access_token=create_access_token(user.id))
 

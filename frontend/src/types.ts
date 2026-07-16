@@ -54,3 +54,60 @@ export const VERDICT_LABELS: Record<string, string> = {
   partial_match: "Частичное соответствие",
   weak_match: "Слабое соответствие",
 };
+
+export type Role = "owner" | "admin" | "recruiter";
+export type PlanTier = "free" | "pro" | "enterprise";
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: "Владелец",
+  admin: "Администратор",
+  recruiter: "Рекрутер",
+};
+
+export interface OrgInfo {
+  id: string;
+  name: string;
+  plan: PlanTier;
+  role: Role;
+  limits: {
+    label: string;
+    price: number | null;
+    max_vacancies: number | null;
+    monthly_analyses: number | null;
+    max_members: number | null;
+  };
+  usage: { analyses_used: number; vacancies: number; members: number };
+}
+
+export interface OrgSummary {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface PlanInfo {
+  plan: PlanTier;
+  label: string;
+  price: number | null;
+  max_vacancies: number | null;
+  monthly_analyses: number | null;
+  max_members: number | null;
+  current: boolean;
+}
+
+export interface Member {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  role: Role;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  token: string;
+  accepted: boolean;
+  created_at: string;
+}

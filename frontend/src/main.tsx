@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { getToken } from "./api";
 import { LoginPage } from "./pages/Login";
+import { SettingsPage } from "./pages/Settings";
 import { VacanciesPage } from "./pages/Vacancies";
 import { VacancyDetailPage } from "./pages/VacancyDetail";
 import "./styles.css";
@@ -29,6 +30,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           element={
             <RequireAuth>
               <VacancyDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <SettingsPage />
             </RequireAuth>
           }
         />

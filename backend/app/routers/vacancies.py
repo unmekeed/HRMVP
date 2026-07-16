@@ -3,20 +3,21 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..deps import get_current_user
-from ..models import Candidate, User, Vacancy
+from ..deps import get_current_org, get_current_user
+from ..models import Candidate, Organization, User, Vacancy
 from ..schemas import VacancyCreate, VacancyOut, VacancyUpdate
+from ..services.limits import enforce_vacancy_limit
 
 router = APIRouter(prefix="/api/vacancies", tags=["vacancies"])
 
 
 async def get_own_vacancy(
     vacancy_id: str,
-    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ) -> Vacancy:
     vacancy = await db.get(Vacancy, vacancy_id)
-    if vacancy is None or vacancy.owner_id != user.id:
+    if vacancy is None or vacancy.org_id != org.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Вакансия не найдена")
     return vacancy
 
@@ -25,9 +26,11 @@ async def get_own_vacancy(
 async def create_vacancy(
     payload: VacancyCreate,
     user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
-    vacancy = Vacancy(owner_id=user.id, **payload.model_dump())
+    await enforce_vacancy_limit(org, db)
+    vacancy = Vacancy(org_id=org.id, owner_id=user.id, **payload.model_dump())
     db.add(vacancy)
     await db.commit()
     return VacancyOut.model_validate(vacancy)
@@ -35,7 +38,7 @@ async def create_vacancy(
 
 @router.get("", response_model=list[VacancyOut])
 async def list_vacancies(
-    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
     counts = (
@@ -46,7 +49,7 @@ async def list_vacancies(
     rows = await db.execute(
         select(Vacancy, func.coalesce(counts.c.cnt, 0))
         .outerjoin(counts, counts.c.vacancy_id == Vacancy.id)
-        .where(Vacancy.owner_id == user.id)
+        .where(Vacancy.org_id == org.id)
         .order_by(Vacancy.created_at.desc())
     )
     result = []
