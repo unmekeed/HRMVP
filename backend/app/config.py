@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Без API-ключа анализ работает в mock-режиме (эвристика по ключевым словам)
     analysis_mode: str = "auto"  # auto | claude | mock
 
+    # Очередь задач. Пусто → анализ выполняется in-process (dev/тесты);
+    # задан → задачи уходят в arq-воркер через Redis.
+    redis_url: str = ""
+
     max_upload_size_mb: int = 10
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 

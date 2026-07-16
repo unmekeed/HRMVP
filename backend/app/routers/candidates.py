@@ -1,6 +1,5 @@
 import csv
 import io
-import logging
 
 from fastapi import (
     APIRouter,
@@ -15,53 +14,15 @@ from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
-from ..database import SessionLocal, get_db
+from ..database import get_db
 from ..deps import get_current_user
 from ..models import AnalysisStatus, Candidate, User, Vacancy
 from ..schemas import CandidateOut, CandidateStatusUpdate
-from ..services.analysis import analyze_resume
 from ..services.extraction import ExtractionError, extract_text
+from ..services.tasks import enqueue_analysis
 from .vacancies import get_own_vacancy
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api", tags=["candidates"])
-
-
-async def _run_analysis(candidate_id: str) -> None:
-    """Фоновая задача: анализ одного резюме в отдельной сессии БД."""
-    async with SessionLocal() as db:
-        candidate = await db.get(Candidate, candidate_id)
-        if candidate is None:
-            return
-        vacancy = await db.get(Vacancy, candidate.vacancy_id)
-        candidate.analysis_status = AnalysisStatus.processing
-        await db.commit()
-        try:
-            result = await analyze_resume(
-                vacancy.title,
-                vacancy.description,
-                vacancy.requirements,
-                candidate.resume_text,
-            )
-            candidate.full_name = result["full_name"]
-            candidate.email = result["email"]
-            candidate.phone = result["phone"]
-            candidate.score = float(result["score"])
-            candidate.verdict = result["verdict"]
-            candidate.summary = result["summary"]
-            candidate.strengths = result["strengths"]
-            candidate.weaknesses = result["weaknesses"]
-            candidate.matched_requirements = result["matched_requirements"]
-            candidate.missing_requirements = result["missing_requirements"]
-            candidate.recommendation = result["recommendation"]
-            candidate.analysis_status = AnalysisStatus.done
-            candidate.analysis_error = ""
-        except Exception as exc:  # ошибка анализа не должна ронять приложение
-            logger.exception("Analysis failed for candidate %s", candidate_id)
-            candidate.analysis_status = AnalysisStatus.error
-            candidate.analysis_error = str(exc)[:2000]
-        await db.commit()
 
 
 @router.post(
@@ -106,7 +67,7 @@ async def upload_resumes(
     await db.commit()
 
     for candidate in created:
-        background.add_task(_run_analysis, candidate.id)
+        await enqueue_analysis(candidate.id, background)
 
     return [CandidateOut.model_validate(c) for c in created]
 
@@ -173,7 +134,7 @@ async def reanalyze_candidate(
     candidate.analysis_status = AnalysisStatus.pending
     candidate.analysis_error = ""
     await db.commit()
-    background.add_task(_run_analysis, candidate.id)
+    await enqueue_analysis(candidate.id, background)
     return CandidateOut.model_validate(candidate)
 
 

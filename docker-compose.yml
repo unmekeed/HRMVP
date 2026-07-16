@@ -13,18 +13,43 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     environment:
       AIS_DATABASE_URL: postgresql+asyncpg://ais:ais@db:5432/ai_screening
+      AIS_REDIS_URL: redis://redis:6379
       AIS_JWT_SECRET: ${AIS_JWT_SECRET:-change-me-in-production}
       AIS_ANTHROPIC_API_KEY: ${AIS_ANTHROPIC_API_KEY:-}
       AIS_ANALYSIS_MODE: ${AIS_ANALYSIS_MODE:-auto}
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+
+  worker:
+    build: ./backend
+    command: arq app.worker.WorkerSettings
+    environment:
+      AIS_DATABASE_URL: postgresql+asyncpg://ais:ais@db:5432/ai_screening
+      AIS_REDIS_URL: redis://redis:6379
+      AIS_ANTHROPIC_API_KEY: ${AIS_ANTHROPIC_API_KEY:-}
+      AIS_ANALYSIS_MODE: ${AIS_ANALYSIS_MODE:-auto}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
