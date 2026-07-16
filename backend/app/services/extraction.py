@@ -31,9 +31,52 @@ def _extract_pdf(data: bytes) -> str:
     except Exception as exc:
         raise ExtractionError(f"Не удалось прочитать PDF: {exc}") from exc
     text = "\n".join(pages).strip()
-    if not text:
-        raise ExtractionError("PDF не содержит извлекаемого текста (возможно, скан без OCR)")
-    return text
+    if text:
+        return text
+
+    # Текстового слоя нет — вероятно, скан. Пробуем OCR.
+    from ..config import get_settings
+
+    if get_settings().ocr_enabled:
+        ocr_text = _ocr_pdf(data)
+        if ocr_text:
+            return ocr_text
+
+    raise ExtractionError(
+        "PDF не содержит извлекаемого текста. Для сканов нужен установленный "
+        "OCR (tesseract + poppler) либо загрузите текстовый PDF/DOCX."
+    )
+
+
+def _ocr_pdf(data: bytes) -> str:
+    """OCR сканированного PDF. Возвращает '' если OCR недоступен или ничего не распознал."""
+    try:
+        import pytesseract
+        from pdf2image import convert_from_bytes
+    except ImportError:
+        return ""
+
+    from ..config import get_settings
+
+    settings = get_settings()
+    try:
+        images = convert_from_bytes(
+            data, dpi=200, last_page=settings.ocr_max_pages
+        )
+    except Exception:
+        # poppler не установлен или файл битый
+        return ""
+
+    parts: list[str] = []
+    for image in images:
+        try:
+            parts.append(pytesseract.image_to_string(image, lang=settings.ocr_lang))
+        except Exception:
+            try:
+                parts.append(pytesseract.image_to_string(image))
+            except Exception:
+                return ""  # tesseract-бинарь недоступен
+    return "\n".join(parts).strip()
 
 
 def _extract_docx(data: bytes) -> str:

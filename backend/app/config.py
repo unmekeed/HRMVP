@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     use_batch_api: bool = False
     batch_threshold: int = 5
 
+    # OCR для сканированных PDF (нужны бинарники tesseract + poppler)
+    ocr_enabled: bool = True
+    ocr_lang: str = "rus+eng"
+    ocr_max_pages: int = 15
+
     max_upload_size_mb: int = 10
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
