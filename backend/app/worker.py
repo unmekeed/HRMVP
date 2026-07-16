@@ -26,7 +26,4 @@ class WorkerSettings:
     functions = [analyze_candidate, submit_analysis_batch, poll_analysis_batch]
     max_jobs = 10
     keep_result = 3600
-
-    @staticmethod
-    def redis_settings() -> RedisSettings:
-        return RedisSettings.from_dsn(get_settings().redis_url)
+    redis_settings = RedisSettings.from_dsn(get_settings().redis_url or "redis://localhost:6379")
