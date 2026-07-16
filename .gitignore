@@ -10,3 +10,9 @@ dist/
 *.local
 
 .DS_Store
+*.tsbuildinfo
+
+# локальные артефакты сборки за прокси
+docker-compose.override.yml
+proxy-ca.crt
+Dockerfile.local
