@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ai_screening
+      POSTGRES_USER: ais
+      POSTGRES_PASSWORD: ais
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ais -d ai_screening"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      AIS_DATABASE_URL: postgresql+asyncpg://ais:ais@db:5432/ai_screening
+      AIS_JWT_SECRET: ${AIS_JWT_SECRET:-change-me-in-production}
+      AIS_ANTHROPIC_API_KEY: ${AIS_ANTHROPIC_API_KEY:-}
+      AIS_ANALYSIS_MODE: ${AIS_ANALYSIS_MODE:-auto}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
