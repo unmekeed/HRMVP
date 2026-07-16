@@ -83,3 +83,9 @@ async def enqueue_analysis(candidate_id: str, background=None) -> None:
         background.add_task(run_analysis, candidate_id)
     else:
         await run_analysis(candidate_id)
+
+
+async def enqueue_batch(vacancy_id: str, candidate_ids: list[str]) -> None:
+    """Поставить задачу отправки batch (только при наличии Redis)."""
+    pool = await _get_pool()
+    await pool.enqueue_job("submit_analysis_batch", vacancy_id, candidate_ids)

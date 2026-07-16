@@ -18,8 +18,9 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import AnalysisStatus, Candidate, User, Vacancy
 from ..schemas import CandidateOut, CandidateStatusUpdate
+from ..services.batch import should_use_batch
 from ..services.extraction import ExtractionError, extract_text
-from ..services.tasks import enqueue_analysis
+from ..services.tasks import enqueue_analysis, enqueue_batch
 from .vacancies import get_own_vacancy
 
 router = APIRouter(prefix="/api", tags=["candidates"])
@@ -66,8 +67,12 @@ async def upload_resumes(
         )
     await db.commit()
 
-    for candidate in created:
-        await enqueue_analysis(candidate.id, background)
+    ids = [c.id for c in created]
+    if should_use_batch(len(ids)):
+        await enqueue_batch(vacancy.id, ids)
+    else:
+        for candidate_id in ids:
+            await enqueue_analysis(candidate_id, background)
 
     return [CandidateOut.model_validate(c) for c in created]
 

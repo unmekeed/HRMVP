@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Alembic (AIS_AUTO_CREATE_TABLES=false + alembic upgrade head).
     auto_create_tables: bool = True
 
+    # Batch API: при загрузке пачки резюме >= batch_threshold отправлять один
+    # batch вместо N запросов (−50% стоимости). Требует Redis и claude-режим.
+    use_batch_api: bool = False
+    batch_threshold: int = 5
+
     max_upload_size_mb: int = 10
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 

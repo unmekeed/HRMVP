@@ -69,17 +69,40 @@ class AnalysisResult(dict):
     """Результат анализа — dict с ключами схемы ANALYSIS_SCHEMA."""
 
 
+def resolve_mode() -> str:
+    """claude | mock — с учётом режима auto и наличия ключа."""
+    settings = get_settings()
+    mode = settings.analysis_mode
+    if mode == "auto":
+        mode = "claude" if settings.anthropic_api_key else "mock"
+    return mode
+
+
+def build_user_message(
+    title: str, description: str, requirements: str, resume_text: str
+) -> str:
+    return (
+        f"<vacancy>\n<title>{title}</title>\n"
+        f"<description>\n{description}\n</description>\n"
+        f"<requirements>\n{requirements}\n</requirements>\n</vacancy>\n\n"
+        f"<resume>\n{resume_text[:MAX_RESUME_CHARS]}\n</resume>\n\n"
+        "Проанализируй соответствие кандидата вакансии."
+    )
+
+
+def parse_analysis_json(text: str) -> AnalysisResult:
+    data = json.loads(text)
+    data["score"] = max(0, min(100, int(data["score"])))
+    return AnalysisResult(data)
+
+
 async def analyze_resume(
     vacancy_title: str,
     vacancy_description: str,
     vacancy_requirements: str,
     resume_text: str,
 ) -> AnalysisResult:
-    settings = get_settings()
-    mode = settings.analysis_mode
-    if mode == "auto":
-        mode = "claude" if settings.anthropic_api_key else "mock"
-    if mode == "claude":
+    if resolve_mode() == "claude":
         return await _analyze_claude(
             vacancy_title, vacancy_description, vacancy_requirements, resume_text
         )
@@ -96,14 +119,6 @@ async def _analyze_claude(
     settings = get_settings()
     client = AsyncAnthropic(api_key=settings.anthropic_api_key or None)
 
-    user_message = (
-        f"<vacancy>\n<title>{title}</title>\n"
-        f"<description>\n{description}\n</description>\n"
-        f"<requirements>\n{requirements}\n</requirements>\n</vacancy>\n\n"
-        f"<resume>\n{resume_text[:MAX_RESUME_CHARS]}\n</resume>\n\n"
-        "Проанализируй соответствие кандидата вакансии."
-    )
-
     response = await client.messages.create(
         model=settings.anthropic_model,
         max_tokens=4096,
@@ -115,16 +130,21 @@ async def _analyze_claude(
             }
         ],
         output_config={"format": {"type": "json_schema", "schema": ANALYSIS_SCHEMA}},
-        messages=[{"role": "user", "content": user_message}],
+        messages=[
+            {
+                "role": "user",
+                "content": build_user_message(
+                    title, description, requirements, resume_text
+                ),
+            }
+        ],
     )
 
     if response.stop_reason == "refusal":
         raise RuntimeError("Модель отказалась анализировать этот документ")
 
     text = next(b.text for b in response.content if b.type == "text")
-    data = json.loads(text)
-    data["score"] = max(0, min(100, int(data["score"])))
-    return AnalysisResult(data)
+    return parse_analysis_json(text)
 
 
 # --- mock-режим: простая эвристика, чтобы продукт работал без API-ключа ---

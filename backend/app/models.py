@@ -38,6 +38,12 @@ class AnalysisStatus(str, enum.Enum):
     error = "error"
 
 
+class BatchStatus(str, enum.Enum):
+    processing = "processing"
+    done = "done"
+    error = "error"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -102,3 +108,18 @@ class Candidate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     vacancy: Mapped[Vacancy] = relationship(back_populates="candidates")
+
+
+class AnalysisBatch(Base):
+    """Пачка резюме, отправленная в Anthropic Message Batches API."""
+
+    __tablename__ = "analysis_batches"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    vacancy_id: Mapped[str] = mapped_column(ForeignKey("vacancies.id"), index=True)
+    provider_batch_id: Mapped[str] = mapped_column(String(255), index=True)
+    status: Mapped[BatchStatus] = mapped_column(
+        Enum(BatchStatus), default=BatchStatus.processing
+    )
+    candidate_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
