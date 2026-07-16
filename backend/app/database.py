@@ -17,6 +17,10 @@ async def get_db():
 
 
 async def init_db() -> None:
+    from .config import get_settings
+
+    if not get_settings().auto_create_tables:
+        return
     from . import models  # noqa: F401
 
     async with engine.begin() as conn:

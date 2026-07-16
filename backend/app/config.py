@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # задан → задачи уходят в arq-воркер через Redis.
     redis_url: str = ""
 
+    # dev/тесты создают таблицы через create_all; в проде схемой управляет
+    # Alembic (AIS_AUTO_CREATE_TABLES=false + alembic upgrade head).
+    auto_create_tables: bool = True
+
     max_upload_size_mb: int = 10
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
